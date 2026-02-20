@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<analysis version="2">
+    <inputs>
+        <input pattern="results/Scenario2_TwoEV_DiffSeverity_LowerFirst-45-*.vec"/>
+        <input pattern="results/Scenario2_TwoEV_DiffSeverity_LowerFirst-45-*.sca"/>
+    </inputs>
+    <charts/>
+</analysis>

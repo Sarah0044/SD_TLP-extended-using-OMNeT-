@@ -71,7 +71,8 @@ class Intersection : public cSimpleModule
     std::vector<int> waitingEvId;          // per-approach: evId waiting at stop line (-1 if none)
     // <<< NEW
 
-
+    int lastPreemptApproach = -1;   // remembers which approach was preempted
+    int recoveryBlockApproach = -1; // approach forced to stay red during recovery
    struct EvWaitInfo {//the EV waiting in the qeueu info
       int evId;
        int approach;

@@ -219,7 +219,7 @@ void Controller::switchSessionWithClear(const EVState& newWinner)
 // endSessionToNormal(): stop current session, apply recovery, return to normal
 // Recovery may include previous TL if distance is below Dthreshold
 // -------------------------
-void Controller::endSessionToNormal()
+/*void Controller::endSessionToNormal()
 {
     if (!session.active) return;
 
@@ -249,7 +249,35 @@ void Controller::endSessionToNormal()
     session.inClear = false;
     session.pendingEvId = -1;
 }
+*/
+void Controller::endSessionToNormal()
+{
+    if (!session.active) return;
 
+    double recoveryDuration = par("recoveryDuration").doubleValue(); // seconds
+    double roadSegLen = par("roadSegmentLength").doubleValue();      // meters
+
+    // Recovery at current intersection (forces preempted approach red for recoveryDuration)
+    sendCmd(session.intersectionId, -1, "RECOVERY", recoveryDuration);
+
+    // If consecutive TLs are closer than Dthreshold, also recover previous TL
+    if (session.intersectionId > 0 && roadSegLen < Dthreshold) {
+        sendCmd(session.intersectionId - 1, -1, "RECOVERY", recoveryDuration);
+    }
+
+    // IMPORTANT: DO NOT send NORMAL here.
+    // Intersection will automatically end recovery after recoveryDuration
+    // using recoveryEnd logic.
+
+    // clear session
+    session.active = false;
+    session.evId = -1;
+    session.intersectionId = -1;
+    session.approach = -1;
+    session.severity = 3;
+    session.inClear = false;
+    session.pendingEvId = -1;
+}
 // -------------------------
 // applyNoPreempt(): baseline
 // -------------------------

@@ -1,0 +1,220 @@
+version 3
+run Scenario2_TwoEV_DiffSeverity_LowerFirst-2-20260220-22:15:30-13894
+attr configname Scenario2_TwoEV_DiffSeverity_LowerFirst
+attr datetime 20260220-22:15:30
+attr datetimef 20260220-221530
+attr experiment Scenario2_TwoEV_DiffSeverity_LowerFirst
+attr inifile omnetpp.ini
+attr iterationvars $0=44
+attr iterationvarsd 44
+attr iterationvarsf 44-
+attr measurement $0=44
+attr network ned.CityNetwork
+attr processid 13894
+attr repetition 0
+attr replication #0
+attr resultdir results
+attr runnumber 2
+attr seedset 44
+config seed-set 44
+config **.numEVs 2
+config *.ev[0].evId 0
+config *.ev[0].severity 1
+config *.ev[0].startPos -300m
+config *.ev[0].destinationPos 300m
+config *.ev[0].speed 16.67mps
+config *.ev[0].approach 3
+config *.ev[0].startTime 305s
+config *.ev[1].evId 1
+config *.ev[1].severity 3
+config *.ev[1].startPos 600m
+config *.ev[1].destinationPos -300m
+config *.ev[1].speed -16.67mps
+config *.ev[1].approach 1
+config *.ev[1].startTime 287s
+config network ned.CityNetwork
+config sim-time-limit 1800s
+config ned-path ned
+config *.numIntersections 4
+config *.controller.method "\"SDTLP_MULTI\""
+config *.controller.L 4.5m
+config *.controller.MG 2.5m
+config *.controller.roadSegmentLength 300m
+config **.inter[*].stabilityExtra 5s
+config *.inter[*].arrivalMean 2.5s
+config *.inter[*].normalSpeed 9.72
+config *.inter[*].queueMax 50
+
+scalar CityNetwork.ev[0] ART_seconds 116
+scalar CityNetwork.ev[0] EV_stopped_seconds 81
+par CityNetwork.controller typename "\"ned.Controller\""
+par CityNetwork.controller numIntersections 4
+par CityNetwork.controller numApproaches 4
+par CityNetwork.controller tClear 3s
+attr unit s
+par CityNetwork.controller tickPeriod 0.5s
+attr unit s
+par CityNetwork.controller L 4.5m
+attr unit m
+par CityNetwork.controller MG 2.5m
+attr unit m
+par CityNetwork.controller regularSpeed 9.72mps
+attr unit mps
+par CityNetwork.controller r 3s
+attr unit s
+par CityNetwork.controller roadSegmentLength 300m
+attr unit m
+par CityNetwork.controller recoveryDuration 5s
+attr unit s
+par CityNetwork.controller useFixedFcfsDD false
+par CityNetwork.controller fixedFcfsDD 150m
+attr unit m
+par CityNetwork.controller method "\"SDTLP_MULTI\""
+par CityNetwork.controller TDthreshold 0.7
+par CityNetwork.controller Dthreshold 150m
+attr unit m
+par CityNetwork.inter[0] typename "\"ned.Intersection\""
+par CityNetwork.inter[0] warmupTime 300s
+attr unit s
+par CityNetwork.inter[0] intersectionId 0
+par CityNetwork.inter[0] numApproaches 4
+par CityNetwork.inter[0] method "\"SDTLP_MULTI\""
+par CityNetwork.inter[0] greenTime 25s
+attr unit s
+par CityNetwork.inter[0] yellowTime 3s
+attr unit s
+par CityNetwork.inter[0] redTime 84s
+attr unit s
+par CityNetwork.inter[0] r 3s
+attr unit s
+par CityNetwork.inter[0] reportPeriod 1s
+attr unit s
+par CityNetwork.inter[0] arrivalMean 2.5s
+attr unit s
+par CityNetwork.inter[0] serviceRate 0.5
+par CityNetwork.inter[0] queueMax 50
+par CityNetwork.inter[0] normalSpeed 9.72mps
+attr unit mps
+par CityNetwork.inter[0] stabilityExtra 5s
+attr unit s
+scalar CityNetwork.inter[0] AIWT_seconds 369.31398963731
+scalar CityNetwork.inter[0] AWT_seconds 284.15163934426
+par CityNetwork.inter[1] typename "\"ned.Intersection\""
+par CityNetwork.inter[1] warmupTime 300s
+attr unit s
+par CityNetwork.inter[1] intersectionId 1
+par CityNetwork.inter[1] numApproaches 4
+par CityNetwork.inter[1] method "\"SDTLP_MULTI\""
+par CityNetwork.inter[1] greenTime 25s
+attr unit s
+par CityNetwork.inter[1] yellowTime 3s
+attr unit s
+par CityNetwork.inter[1] redTime 84s
+attr unit s
+par CityNetwork.inter[1] r 3s
+attr unit s
+par CityNetwork.inter[1] reportPeriod 1s
+attr unit s
+par CityNetwork.inter[1] arrivalMean 2.5s
+attr unit s
+par CityNetwork.inter[1] serviceRate 0.5
+par CityNetwork.inter[1] queueMax 50
+par CityNetwork.inter[1] normalSpeed 9.72mps
+attr unit mps
+par CityNetwork.inter[1] stabilityExtra 5s
+attr unit s
+scalar CityNetwork.inter[1] AIWT_seconds 426.62937062937
+scalar CityNetwork.inter[1] AWT_seconds 35.333333333333
+par CityNetwork.inter[2] typename "\"ned.Intersection\""
+par CityNetwork.inter[2] warmupTime 300s
+attr unit s
+par CityNetwork.inter[2] intersectionId 2
+par CityNetwork.inter[2] numApproaches 4
+par CityNetwork.inter[2] method "\"SDTLP_MULTI\""
+par CityNetwork.inter[2] greenTime 25s
+attr unit s
+par CityNetwork.inter[2] yellowTime 3s
+attr unit s
+par CityNetwork.inter[2] redTime 84s
+attr unit s
+par CityNetwork.inter[2] r 3s
+attr unit s
+par CityNetwork.inter[2] reportPeriod 1s
+attr unit s
+par CityNetwork.inter[2] arrivalMean 2.5s
+attr unit s
+par CityNetwork.inter[2] serviceRate 0.5
+par CityNetwork.inter[2] queueMax 50
+par CityNetwork.inter[2] normalSpeed 9.72mps
+attr unit mps
+par CityNetwork.inter[2] stabilityExtra 5s
+attr unit s
+scalar CityNetwork.inter[2] AIWT_seconds 387.91900311526
+scalar CityNetwork.inter[2] AWT_seconds 51.539215686275
+par CityNetwork.inter[3] typename "\"ned.Intersection\""
+par CityNetwork.inter[3] warmupTime 300s
+attr unit s
+par CityNetwork.inter[3] intersectionId 3
+par CityNetwork.inter[3] numApproaches 4
+par CityNetwork.inter[3] method "\"SDTLP_MULTI\""
+par CityNetwork.inter[3] greenTime 25s
+attr unit s
+par CityNetwork.inter[3] yellowTime 3s
+attr unit s
+par CityNetwork.inter[3] redTime 84s
+attr unit s
+par CityNetwork.inter[3] r 3s
+attr unit s
+par CityNetwork.inter[3] reportPeriod 1s
+attr unit s
+par CityNetwork.inter[3] arrivalMean 2.5s
+attr unit s
+par CityNetwork.inter[3] serviceRate 0.5
+par CityNetwork.inter[3] queueMax 50
+par CityNetwork.inter[3] normalSpeed 9.72mps
+attr unit mps
+par CityNetwork.inter[3] stabilityExtra 5s
+attr unit s
+scalar CityNetwork.inter[3] AIWT_seconds 715.97297297297
+scalar CityNetwork.inter[3] AWT_seconds 48.166666666667
+par CityNetwork.rsu[0] typename "\"ned.RSU\""
+par CityNetwork.rsu[0] rsuId 0
+par CityNetwork.rsu[1] typename "\"ned.RSU\""
+par CityNetwork.rsu[1] rsuId 1
+par CityNetwork.rsu[2] typename "\"ned.RSU\""
+par CityNetwork.rsu[2] rsuId 2
+par CityNetwork.rsu[3] typename "\"ned.RSU\""
+par CityNetwork.rsu[3] rsuId 3
+par CityNetwork.ev[0] typename "\"ned.EmergencyVehicle\""
+par CityNetwork.ev[0] evId 0
+par CityNetwork.ev[0] severity 1
+par CityNetwork.ev[0] startPos -300m
+attr unit m
+par CityNetwork.ev[0] destinationPos 300m
+attr unit m
+par CityNetwork.ev[0] approach 3
+par CityNetwork.ev[0] startTime 305s
+attr unit s
+par CityNetwork.ev[0] speed 16.67mps
+attr unit mps
+scalar CityNetwork.ev[0] EV_finalPos 300.12
+scalar CityNetwork.ev[0] EV_waitingForGo 0
+par CityNetwork.ev[1] typename "\"ned.EmergencyVehicle\""
+par CityNetwork.ev[1] evId 1
+par CityNetwork.ev[1] severity 3
+par CityNetwork.ev[1] startPos 600m
+attr unit m
+par CityNetwork.ev[1] destinationPos -300m
+attr unit m
+par CityNetwork.ev[1] approach 1
+par CityNetwork.ev[1] startTime 287s
+attr unit s
+par CityNetwork.ev[1] speed -16.67mps
+attr unit mps
+scalar CityNetwork.ev[1] ART_seconds 1513
+scalar CityNetwork.ev[1] EV_finalPos 296.27
+scalar CityNetwork.ev[1] EV_waitingForGo 1
+par CityNetwork typename "\"ned.CityNetwork\""
+par CityNetwork numIntersections 4
+par CityNetwork numEVs 2
+

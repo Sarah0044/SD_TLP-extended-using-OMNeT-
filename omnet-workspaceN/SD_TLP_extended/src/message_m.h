@@ -201,7 +201,7 @@ inline void doParsimUnpacking(omnetpp::cCommBuffer *b, QueueReport& obj) {obj.pa
 /**
  * Class generated from <tt>message.msg:27</tt> by opp_msgtool.
  * <pre>
- * message SignalState
+ * message SignalState //from intersection to ev that send the traffic signal state every second to ev.
  * {
  *     int intersectionId;
  *     int greenApproach;   // 0..3, or -1 for all-red

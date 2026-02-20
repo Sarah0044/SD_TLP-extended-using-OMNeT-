@@ -749,6 +749,7 @@ void Intersection::finish()
     cancelAndDelete(phaseTimer);
 }
 */
+/*
 #include "Intersection.h"
 #include "message_m.h"
 using namespace omnetpp;
@@ -1219,6 +1220,533 @@ void Intersection::handleMessage(cMessage *msg)
             // ---------------------------------------------------------
             // METRICS WINDOW: EV leaves here (green+empty case)
             // ---------------------------------------------------------
+            if (simTime() >= warmupTime) {
+                rescueCountPerApproach[currentActiveApproach] =
+                    std::max(0, rescueCountPerApproach[currentActiveApproach] - 1);
+
+                activeEvCount = std::max(0, activeEvCount - 1);
+                lastRescueApproach = currentActiveApproach;
+
+                if (activeEvCount == 0) {
+                    metricsEnd = simTime() + stabilityExtra;
+                }
+            }
+
+            waitingEvId[currentActiveApproach] = -1;
+        }
+
+        scheduleAt(simTime() + 1.0, phaseTimer);
+        return;
+    }
+
+    delete msg;
+}
+
+void Intersection::finish()
+{
+    // AIWT = imposed waiting / affected vehicles
+    if (totalArrivalsCross > 0)
+        recordScalar("AIWT_seconds", waitingImposedSec / (double)totalArrivalsCross);
+    else
+        recordScalar("AIWT_seconds", 0.0);
+
+    // AWT = rescue-route waiting / served rescue vehicles
+    if (servedRescueVeh > 0)
+        recordScalar("AWT_seconds", waitingRescueRouteSec / (double)servedRescueVeh);
+    else
+        recordScalar("AWT_seconds", 0.0);
+
+    // Cleanup
+    for (auto *t : arrivalTimers) cancelAndDelete(t);
+    cancelAndDelete(reportTimer);
+    cancelAndDelete(phaseTimer);
+}*/
+#include "Intersection.h"
+#include "message_m.h"
+using namespace omnetpp;
+
+#include <cstring>
+#include <string>
+#include <algorithm>
+
+Define_Module(Intersection);
+
+// Ensures that traffic density (TD) is between 0 and 1
+static double clamp01(double x) {
+    if (x < 0.0) return 0.0;
+    if (x > 1.0) return 1.0;
+    return x;
+}
+
+void Intersection::initialize()
+{
+    EV_INFO << "[CHECK] run=" << getEnvir()->getConfigEx()->getActiveRunNumber()
+            << " u=" << uniform(0.0, 1.0, 0)
+            << " initGreen=" << currentGreen << "\n";
+
+    // --- Parameters ---
+    intersectionId = par("intersectionId");
+    numApproaches  = par("numApproaches");
+    method         = par("method").stdstringValue();
+
+    greenTime    = par("greenTime");
+    yellowTime   = par("yellowTime");
+    redTime      = par("redTime");
+    rDelay       = par("r");
+
+    reportPeriod = par("reportPeriod");
+    arrivalMean  = par("arrivalMean");
+    queueMax     = par("queueMax");
+
+    warmupTime   = par("warmupTime");
+
+    // ------------------------------------------------------------------
+    // Metrics window parameter (paper-style):
+    // keep measuring a bit after the EV passes to capture stabilization
+    // ------------------------------------------------------------------
+    stabilityExtra = par("stabilityExtra").doubleValue();
+
+    // ===== Metrics window state (works for ALL methods) =====
+    metricsActive = false;
+    metricsEnd = SIMTIME_ZERO;
+    activeEvCount = 0;
+    lastRescueApproach = -1;
+    rescueCountPerApproach.assign(numApproaches, 0);
+    // =======================================================
+
+    // EV queue realism state (per approach)
+    evAhead.assign(numApproaches, 0);
+    waitingEvId.assign(numApproaches, -1);
+
+    // --- Service Rate Logic ---
+    double normalSpeed = par("normalSpeed").doubleValue();
+    double vehLength = 4.5;
+    double minGap    = 2.5;
+    serviceRate = normalSpeed / (vehLength + minGap);
+
+    // --- Signal State ---
+    currentGreen = intuniform(0, numApproaches-1);
+    inYellowOrAllRed = false;
+    phaseEnd = simTime() + greenTime;
+
+    // --- Queues & Timers ---
+    queueLen.assign(numApproaches, 0);
+
+    arrivalTimers.resize(numApproaches, nullptr);
+    for (int a = 0; a < numApproaches; a++) {
+        arrivalTimers[a] = new cMessage(("arrive_" + std::to_string(a)).c_str());
+        scheduleAt(simTime() + exponential(arrivalMean.dbl()), arrivalTimers[a]);
+    }
+
+    reportTimer = new cMessage("reportTimer");
+    scheduleAt(simTime() + reportPeriod, reportTimer);
+
+    phaseTimer = new cMessage("phaseTimer");
+    scheduleAt(simTime() + 1.0, phaseTimer);
+
+    // --- Metrics Init ---
+    waitingImposedSec = 0.0;
+    totalArrivalsCross = 0;
+
+    waitingRescueRouteSec = 0.0;
+    servedRescueVeh = 0;
+
+    // --- Preemption & Recovery State ---
+    preemptActive = false;
+    recoveryActive = false;
+    recoveryEnd = SIMTIME_ZERO;
+
+    preemptApproach = -1;
+    rescueRouteApproach = -1;
+
+    // =========================================================
+    // MINIMAL RECOVERY FIX (paper meaning):
+    // Recovery forces the PREEMPTED approach to stay RED for a duration.
+    // So we remember which approach was last preempted, and during recovery
+    // we skip it from becoming green.
+    //
+    // IMPORTANT: add these two member variables in Intersection.h:
+    //   int lastPreemptApproach = -1;
+    //   int recoveryBlockApproach = -1;
+    // =========================================================
+    lastPreemptApproach = -1;
+    recoveryBlockApproach = -1;
+}
+
+void Intersection::handleMessage(cMessage *msg)
+{
+    // =========================================================
+    // 1) VEHICLE ARRIVALS
+    // =========================================================
+    for (int a = 0; a < numApproaches; a++) {
+        if (msg == arrivalTimers[a]) {
+            queueLen[a]++;
+            totalArrivalsAll++;
+
+            // AIWT denominator: arrivals on cross routes during impact window
+            if (simTime() >= warmupTime && metricsActive) {
+
+                bool isRescueApproachNow = false;
+
+                if (activeEvCount > 0) {
+                    isRescueApproachNow = (rescueCountPerApproach[a] > 0);
+                } else {
+                    isRescueApproachNow = (lastRescueApproach != -1 && a == lastRescueApproach);
+                }
+
+                if (!isRescueApproachNow) {
+                    totalArrivalsCross++;
+                }
+            }
+
+            scheduleAt(simTime() + exponential(arrivalMean.dbl()), arrivalTimers[a]);
+            return;
+        }
+    }
+
+    // =========================================================
+    // 2) QUEUE REPORTING TO CONTROLLER
+    // =========================================================
+    if (msg == reportTimer) {
+        for (int a = 0; a < numApproaches; a++) {
+            QueueReport *qr = new QueueReport("QueueReport");
+            qr->setIntersectionId(intersectionId);
+            qr->setApproach(a);
+            qr->setC(queueLen[a]);
+            qr->setTD(clamp01((double)queueLen[a] / (double)queueMax));
+            send(qr, "toController");
+        }
+        scheduleAt(simTime() + reportPeriod, reportTimer);
+        return;
+    }
+
+    // =========================================================
+    // 3) TRAFFIC LIGHT COMMANDS FROM CONTROLLER
+    // =========================================================
+    if (strcmp(msg->getName(), "TlCommand") == 0) {
+        TlCommand *cmd = check_and_cast<TlCommand *>(msg);
+        std::string action = cmd->getAction();
+
+        if (action == "PREEMPT") {
+            preemptActive = true;
+            recoveryActive = false;
+
+            preemptApproach = cmd->getApproach();
+            rescueRouteApproach = preemptApproach;
+
+            // MINIMAL FIX: remember which approach was preempted
+            lastPreemptApproach = preemptApproach;
+            recoveryBlockApproach = -1; // not in recovery now
+        }
+        else if (action == "CLEAR") {
+            preemptActive = true;
+            recoveryActive = false;
+            preemptApproach = -1;
+
+            // keep lastPreemptApproach as-is (might be used for recovery later)
+        }
+        else if (action == "RECOVERY") {
+            preemptActive = false;
+            recoveryActive = true;
+            preemptApproach = -1;
+
+            // MINIMAL FIX: during recovery, block the last preempted approach (force it red)
+            recoveryBlockApproach = lastPreemptApproach;
+
+            recoveryEnd = simTime() + cmd->getDuration();
+        }
+        else if (action == "NORMAL") {
+            preemptActive = false;
+            recoveryActive = false;
+            preemptApproach = -1;
+
+            // MINIMAL FIX: clear the recovery block
+            recoveryBlockApproach = -1;
+        }
+
+        delete cmd;
+        return;
+    }
+
+    // =========================================================
+    // 3.5) EV ARRIVES NEAR STOP LINE (join queue snapshot)
+    // =========================================================
+    if (strcmp(msg->getName(), "EvAtStopLine") == 0) {
+        EvAtStopLine *m = check_and_cast<EvAtStopLine*>(msg);
+
+        if (m->getIntersectionId() == intersectionId) {
+
+            int a = m->getApproach();
+
+            if (a >= 0 && a < numApproaches && waitingEvId[a] == -1) {
+
+                waitingEvId[a] = m->getEvId();
+
+                // Snapshot: cars currently in queue are ahead of EV.
+                evAhead[a] = queueLen[a];
+
+                EV_INFO << "[EV] EV " << waitingEvId[a]
+                        << " registered at intersection " << intersectionId
+                        << " approach " << a
+                        << " with " << evAhead[a] << " cars ahead.\n";
+
+                // METRICS WINDOW START
+                if (simTime() >= warmupTime) {
+                    metricsActive = true;
+                    metricsEnd = SIMTIME_ZERO;
+                    activeEvCount++;
+                    lastRescueApproach = a;
+                    rescueCountPerApproach[a]++;
+                }
+
+                // Tell EV how many cars are ahead right now
+                EvQueueAhead *qa = new EvQueueAhead("EvQueueAhead");
+                qa->setEvId(waitingEvId[a]);
+                qa->setIntersectionId(intersectionId);
+                qa->setApproach(a);
+                qa->setAhead(evAhead[a]);
+
+                for (int k = 0; k < gateSize("toEV"); k++)
+                    send(qa->dup(), "toEV", k);
+                delete qa;
+
+                // FIX 1: if queue is already empty AND approach is currently green
+                // release EV immediately — no need to wait for discharge tick
+                int currentActiveApproachNow = -1;
+
+                if (!preemptActive) {
+                    if (!inYellowOrAllRed) currentActiveApproachNow = currentGreen;
+                } else {
+                    currentActiveApproachNow = preemptApproach;
+                }
+
+                // MINIMAL FIX: if we are in recovery and this approach is blocked, it cannot be green
+                if (recoveryActive && currentActiveApproachNow == recoveryBlockApproach) {
+                    currentActiveApproachNow = -1;
+                }
+
+                if (evAhead[a] == 0 && a == currentActiveApproachNow) {
+
+                    EV_INFO << "[EV] EV " << waitingEvId[a]
+                            << " released immediately (green + empty queue).\n";
+
+                    EvGo *go = new EvGo("EvGo");
+                    go->setEvId(waitingEvId[a]);
+                    go->setIntersectionId(intersectionId);
+
+                    for (int k = 0; k < gateSize("toEV"); k++)
+                        send(go->dup(), "toEV", k);
+                    delete go;
+
+                    // METRICS WINDOW: EV leaves immediately here
+                    if (simTime() >= warmupTime) {
+                        rescueCountPerApproach[a] = std::max(0, rescueCountPerApproach[a] - 1);
+                        activeEvCount = std::max(0, activeEvCount - 1);
+                        lastRescueApproach = a;
+
+                        if (activeEvCount == 0) {
+                            metricsEnd = simTime() + stabilityExtra;
+                        }
+                    }
+
+                    waitingEvId[a] = -1;
+                }
+            }
+        }
+
+        delete m;
+        return;
+    }
+
+    // =========================================================
+    // 4) 1-SECOND TICK: METRICS + PHASE UPDATE + DISCHARGE
+    // =========================================================
+    if (msg == phaseTimer) {
+
+        // --- Stop recovery if its duration has ended ---
+        if (recoveryActive && simTime() >= recoveryEnd) {
+            recoveryActive = false;
+            recoveryBlockApproach = -1; // MINIMAL FIX
+        }
+
+        // METRICS WINDOW STOP
+        if (metricsActive &&
+            metricsEnd != SIMTIME_ZERO &&
+            simTime() >= metricsEnd) {
+
+            metricsActive = false;
+            metricsEnd = SIMTIME_ZERO;
+            lastRescueApproach = -1;
+        }
+
+        // --- Signal Phase Logic ---
+        int currentActiveApproach = -1;
+
+        if (!preemptActive) {
+            if (simTime() >= phaseEnd) {
+                if (!inYellowOrAllRed) {
+                    inYellowOrAllRed = true;
+                    phaseEnd = simTime() + yellowTime + rDelay;
+                } else {
+                    inYellowOrAllRed = false;
+                    currentGreen = (currentGreen + 1) % numApproaches;
+                    phaseEnd = simTime() + greenTime;
+                }
+            }
+            if (!inYellowOrAllRed) {
+                currentActiveApproach = currentGreen;
+            }
+        } else {
+            currentActiveApproach = preemptApproach;
+        }
+
+        // =========================================================
+        // MINIMAL RECOVERY BEHAVIOR:
+        // If we are in recovery, the preempted approach must be RED.
+        // In our model that means: it cannot be the active green approach.
+        // If the normal cycle selects it, we immediately skip to the next approach.
+        // =========================================================
+        if (recoveryActive &&
+            recoveryBlockApproach >= 0 &&
+            currentActiveApproach == recoveryBlockApproach) {
+
+            // skip blocked approach deterministically
+            int next = (recoveryBlockApproach + 1) % numApproaches;
+            currentGreen = next;
+            currentActiveApproach = next;
+
+            // restart the green cleanly (avoid half-yellow artifacts)
+            inYellowOrAllRed = false;
+            phaseEnd = simTime() + greenTime;
+        }
+
+        // --- Send signal state to EVs ---
+        for (int k = 0; k < gateSize("toEV"); k++) {
+            SignalState *st = new SignalState("SignalState");
+            st->setIntersectionId(intersectionId);
+            st->setGreenApproach(currentActiveApproach);
+            st->setPreemptActive(preemptActive);
+            send(st, "toEV", k);
+        }
+
+        // --- Accumulate waiting times ---
+        if (simTime() >= warmupTime && metricsActive) {
+
+            for (int a = 0; a < numApproaches; a++) {
+
+                bool isRescueApproachNow = false;
+
+                if (activeEvCount > 0) {
+                    isRescueApproachNow = (rescueCountPerApproach[a] > 0);
+                } else {
+                    isRescueApproachNow = (lastRescueApproach != -1 && a == lastRescueApproach);
+                }
+
+                if (!isRescueApproachNow) {
+                    waitingImposedSec += queueLen[a];
+                }
+
+                if (isRescueApproachNow) {
+                    waitingRescueRouteSec += queueLen[a];
+                }
+            }
+        }
+
+        // --- Vehicle Discharge ---
+        if (currentActiveApproach >= 0 && queueLen[currentActiveApproach] > 0) {
+
+            int served = (int)serviceRate;
+            if (dblrand() < (serviceRate - served)) served++;
+            served = std::min(served, queueLen[currentActiveApproach]);
+            queueLen[currentActiveApproach] -= served;
+
+            // If EV is waiting, reduce cars ahead of it
+            if (waitingEvId[currentActiveApproach] != -1) {
+
+                if (evAhead[currentActiveApproach] > 0) {
+                    int servedAhead = std::min(served, evAhead[currentActiveApproach]);
+                    evAhead[currentActiveApproach] -= servedAhead;
+
+                    EvQueueAhead *qa = new EvQueueAhead("EvQueueAhead");
+                    qa->setEvId(waitingEvId[currentActiveApproach]);
+                    qa->setIntersectionId(intersectionId);
+                    qa->setApproach(currentActiveApproach);
+                    qa->setAhead(evAhead[currentActiveApproach]);
+
+                    for (int k = 0; k < gateSize("toEV"); k++)
+                        send(qa->dup(), "toEV", k);
+                    delete qa;
+                }
+
+                // All cars ahead cleared -> release EV
+                if (evAhead[currentActiveApproach] == 0) {
+
+                    EV_INFO << "[EV] EV " << waitingEvId[currentActiveApproach]
+                            << " released at intersection " << intersectionId
+                            << " approach " << currentActiveApproach
+                            << " (queue cleared).\n";
+
+                    EvGo *go = new EvGo("EvGo");
+                    go->setEvId(waitingEvId[currentActiveApproach]);
+                    go->setIntersectionId(intersectionId);
+
+                    for (int k = 0; k < gateSize("toEV"); k++)
+                        send(go->dup(), "toEV", k);
+                    delete go;
+
+                    // METRICS WINDOW: EV leaves here
+                    if (simTime() >= warmupTime) {
+                        rescueCountPerApproach[currentActiveApproach] =
+                            std::max(0, rescueCountPerApproach[currentActiveApproach] - 1);
+
+                        activeEvCount = std::max(0, activeEvCount - 1);
+                        lastRescueApproach = currentActiveApproach;
+
+                        if (activeEvCount == 0) {
+                            metricsEnd = simTime() + stabilityExtra;
+                        }
+                    }
+
+                    waitingEvId[currentActiveApproach] = -1;
+                }
+            }
+
+            // AWT denominator
+            if (simTime() >= warmupTime && metricsActive) {
+
+                bool isRescueActiveApproach = false;
+
+                if (activeEvCount > 0) {
+                    isRescueActiveApproach = (rescueCountPerApproach[currentActiveApproach] > 0);
+                } else {
+                    isRescueActiveApproach =
+                        (lastRescueApproach != -1 && currentActiveApproach == lastRescueApproach);
+                }
+
+                if (isRescueActiveApproach) {
+                    servedRescueVeh += served;
+                }
+            }
+        }
+        // FIX 2: green + empty + EV is registered waiting
+        else if (currentActiveApproach >= 0 &&
+                 queueLen[currentActiveApproach] == 0 &&
+                 waitingEvId[currentActiveApproach] != -1 &&
+                 evAhead[currentActiveApproach] == 0) {
+
+            EV_INFO << "[EV] EV " << waitingEvId[currentActiveApproach]
+                    << " released at intersection " << intersectionId
+                    << " approach " << currentActiveApproach
+                    << " (green + empty queue on tick).\n";
+
+            EvGo *go = new EvGo("EvGo");
+            go->setEvId(waitingEvId[currentActiveApproach]);
+            go->setIntersectionId(intersectionId);
+
+            for (int k = 0; k < gateSize("toEV"); k++)
+                send(go->dup(), "toEV", k);
+            delete go;
+
             if (simTime() >= warmupTime) {
                 rescueCountPerApproach[currentActiveApproach] =
                     std::max(0, rescueCountPerApproach[currentActiveApproach] - 1);

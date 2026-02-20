@@ -23,29 +23,29 @@ message QueueReport {
     int C;//the number of vehicles in front of the emergency vehicle at the intersection (queue length for an approach)
     double TD;//Traffic Density value to compare with the threshold
 }
-message SignalState
+message SignalState //from intersection to ev that send the traffic signal state every second to ev.
 {
     int intersectionId;
     int greenApproach;   // 0..3, or -1 for all-red
     bool preemptActive;
 }
-packet EvAtStopLine {//the point where the EV reaches the intersection
+packet EvAtStopLine {//the point where the EV reaches the intersection  
     int evId;
     int intersectionId;
     int approach;
     int severity;
 }
 
-packet EvGo {//intersection says “your lane is clear, you can cross now”
+packet EvGo {//intersection says “your lane is clear, you can cross now” (from intersection to ev so the ev can move because its green and no cars infront of it)
     int evId;
     int intersectionId;
 }
 
-message EvCleared {//EV informs controller it actually crossed so the controller can end preemption safely
+message EvCleared {//EV informs controller it actually crossed so the controller can end preemption safely (from ev to rsu, and the rsu will send it to controller)
     int evId;
     int intersectionId;
 }
-packet EvQueueAhead {
+packet EvQueueAhead { //from intersection to ev to tell the ev how many cars infront of it
     int evId;
     int intersectionId;
     int approach;
