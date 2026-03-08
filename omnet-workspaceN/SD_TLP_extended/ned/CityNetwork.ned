@@ -48,16 +48,16 @@ network CityNetwork
         }
 
         // Intersection -> EV (broadcast signal state to all EVs)
-for i=0..numIntersections-1 {
-    inter[i].toEV++ --> ev[0].fromIntersection++;
-    inter[i].toEV++ --> ev[1].fromIntersection++;
-  //  inter[i].toEV++ --> ev[2].fromIntersection++;
-    //inter[i].toEV++ --> ev[3].fromIntersection++;
-}
-// RSU -> Intersection (EvAtStopLine forwarding)
-for i=0..numIntersections-1 {
-    rsu[0].toIntersection++ --> inter[i].fromRSU;
-}
+        for i=0..numIntersections-1 {
+           inter[i].toEV++ --> ev[0].fromIntersection++;
+          // inter[i].toEV++ --> ev[1].fromIntersection++;
+         //inter[i].toEV++ --> ev[2].fromIntersection++;
+         //inter[i].toEV++ --> ev[3].fromIntersection++;
+        }
+      // RSU -> Intersection (EvAtStopLine sending)
+          for i=0..numIntersections-1 {
+          rsu[0].toIntersection++ --> inter[i].fromRSU;
+           }
 
 
 

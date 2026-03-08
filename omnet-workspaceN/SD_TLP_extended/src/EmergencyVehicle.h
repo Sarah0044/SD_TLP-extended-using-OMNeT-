@@ -11,13 +11,13 @@ class EmergencyVehicle : public cSimpleModule
     int severity = 1; //priority  1 =ambulance, 2=FT, 3=police
     int approach = 0; //which direction the EV approaches from (N=0,E=1,S=2,W=3)
 
-    std::vector<int> lastGreen;   // last known green approach per intersection
-//    double stopLineEps = 5.0;
-    bool waitingForGo = false;
-    bool sentStopLineReq = false;
-    int  waitingIntersection = -1;
-     int  aheadCars = 0;          // NEW: cars still ahead of EV
-    bool artRecorded = false;    // NEW: so finish() doesn’t overwrite ART
+    std::vector<int> lastGreen; // last known green approach per intersection so thhe EV can know whether to stop or continue if its green in its approach
+   //double stopLineEps = 5.0;
+    bool waitingForGo = false;//if true--> then the EV must wait (because red or traffic)
+    bool sentStopLineReq = false; //tracks whether the EV has already sent a stop-line request (meaning if it entered road segment of intersection)
+    int  waitingIntersection = -1;//stores which intersection the EV is currently waiting at.
+     int  aheadCars = 0;          //cars still ahead of EV
+    bool artRecorded = false;    //  so finish() doesn’t overwrite ART
 
 
     double stoppedTime;

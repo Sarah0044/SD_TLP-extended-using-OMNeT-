@@ -47,12 +47,19 @@ class Intersection : public cSimpleModule
     simtime_t phaseEnd = 0;        // when the current phase ends (The simulation time at which the current traffic-light phase should stop.)
 
     int baselineActiveEVs;        // NO_PREEMPT: how many EVs are currently in baseline window
-
+    simtime_t clearUntil;
+    // ===== Option A: cumulative denominators across ALL windows =====
+    long long aiwtA_initialCrossSum  = 0;
+    long long aiwtA_arrivalsCrossSum = 0;
+    long long awtA_initialRescueSum  = 0;
+    long long awtA_arrivalsRescueSum = 0;
     // --- traffic model ---
     simtime_t arrivalMean; //average interval arrival time  of vehicles (10s/5s/2.5s for low/med/high)
     double serviceRate = 0.5;//how many vehicles leave/exit the queue per second during green (0.5 = one vehicle every 2 seconds)
-    int queueMax = 50;// max amount of vehicles in the lane/queue
-
+    int queueMax = 43;// max amount of vehicles in the lane/queue
+    long arrivalsCrossWindow, arrivalsRescueWindow;
+    long initialCrossQueued, initialRescueQueued;
+    bool windowSnapTaken;
     // queues per approach
     std::vector<int> queueLen;//stores the queue length for each approach, (example: queueLen[1] = East)
 
@@ -85,7 +92,9 @@ class Intersection : public cSimpleModule
            if (evWaitQ[i].evId == evId) return i;
        return -1;
    }
-
+   // Preempt safety clearance before forcing green
+   int pendingPreemptApproach = -1;
+   simtime_t preemptClearEnd = SIMTIME_ZERO;
 
    // --- UNION metrics window state ---
    bool metricsActive;
@@ -112,6 +121,7 @@ class Intersection : public cSimpleModule
 
             // Global stats
             long totalArrivalsAll = 0;
+            int lastGreenApproach;
   protected:
     virtual void initialize() override;
     virtual void handleMessage(cMessage *msg) override;

@@ -1,4 +1,4 @@
-message EvUpdate {
+message EvUpdate {//(from EV to RSU to controller)
     int evId; //ID of the EV
     int severity; // meaning priority: Ambulance=1, Fire=2, Police=3.
     int targetInter; // Which intersection the EV is currently approaching to know which traffic light is relevant
@@ -29,7 +29,7 @@ message SignalState //from intersection to ev that send the traffic signal state
     int greenApproach;   // 0..3, or -1 for all-red
     bool preemptActive;
 }
-packet EvAtStopLine {//the point where the EV reaches the intersection  
+packet EvAtStopLine {//the point where the EV reaches the intersection  (from EV to intersection)
     int evId;
     int intersectionId;
     int approach;
@@ -41,10 +41,10 @@ packet EvGo {//intersection says “your lane is clear, you can cross now” (fr
     int intersectionId;
 }
 
-message EvCleared {//EV informs controller it actually crossed so the controller can end preemption safely (from ev to rsu, and the rsu will send it to controller)
-    int evId;
-    int intersectionId;
-}
+//message EvCleared {//EV informs controller it actually crossed so the controller can end preemption safely (from ev to rsu, and the rsu will send it to controller)
+    //int evId;
+   // int intersectionId;
+//}
 packet EvQueueAhead { //from intersection to ev to tell the ev how many cars infront of it
     int evId;
     int intersectionId;

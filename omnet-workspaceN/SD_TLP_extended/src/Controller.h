@@ -16,7 +16,7 @@
 class Controller : public cSimpleModule
 {
   private:
-    // ---- parameters (from NED/ini) ----
+    //   parameters (from NED/ini)
     int numIntersections = 4;
     int numApproaches = 4;
     int fcfsOwner = -1;
@@ -24,9 +24,9 @@ class Controller : public cSimpleModule
     std::string method;          // "NO_PREEMPT", "FCFS", "SDTLP", "SDTLP_MULTI"
     double TDthreshold = 0.7;    // fixed paper parameter
     double Dthreshold = 150.0;   // meters (min distance between two traffic lights to see if both should be red or only current)
-    simtime_t tClear = 3.0;      // all-red clearance time when switching sessions (safety buffer)
+    simtime_t tClear = 3.0;      // all-red clearance time when switching traffic lights (safety buffer)
 
-    // ---- the latest queue state for one [intersection][approach] ----
+    // the latest queue state for one [intersection][approach]
     struct QueueState {
         int C = 0;       // queue length
         double TD = 0.0; // traffic density of the specific approach
@@ -34,7 +34,7 @@ class Controller : public cSimpleModule
     };
     std::vector<std::vector<QueueState>> q; // size: numIntersections x numApproaches
 
-    // ---- EV state tracked at controller ----
+    // EV state tracked at controller
     struct EVState {
         int evId = -1;                 //id of ev
         int severity = 3;             // smaller = higher priority (1 highest)
@@ -48,7 +48,7 @@ class Controller : public cSimpleModule
         simtime_t eligibleSince = SIMTIME_ZERO;   // first time DEMV <= DD
         bool hasEligibleSince = false;            // to store it only once
 
-        // helper: EAT (seconds) to target stop line
+        //   EAT (seconds) to intersection stop line
         double eat() const {
             if (speed <= 0.0) return 1e9;
             return DEMV / speed;
@@ -58,7 +58,7 @@ class Controller : public cSimpleModule
     // active EVs by evId
     std::map<int, EVState> evs;
 
-    // ---- preemption session (who currently controls signals) ----
+    //  preemption session (who currently controls signals)
     struct Session {
         bool active = false;
         int evId = -1;               // EV that owns the session
@@ -72,25 +72,22 @@ class Controller : public cSimpleModule
 
     } session;
 
-    // ---- controller timer to periodically re-evaluate ----
+    // controller timer to periodically re-evaluate
     cMessage *tick = nullptr;
     simtime_t tickPeriod = 0.2;      // controller decision frequency
 
   private:
-    // ----- decision helpers -----
     bool haveFreshQueues(int interId) const;
-    int pickWinnerEvId() const;              // multi-ev arbitration (or single)
+    int pickWinnerEvId() const;      // multi-ev arbitration (or single)
     void applyNoPreempt();
     void applyFcfs();
     void applySdtlpSingle();
     void applySdtlpMulti();
     double computeDD_dynamic(int targetInter, int approach) const;
 
-    // send helpers
-    void sendCmd(int interId, int approach, const char *action, double durationSec);
+     void sendCmd(int interId, int approach, const char *action, double durationSec);
 
-    // session transitions
-    void startSession(const EVState& ev);
+     void startSession(const EVState& ev);
     void switchSessionWithClear(const EVState& ev); // higher priority override: CLEAR then PREEMPT
     void endSessionToNormal();
 

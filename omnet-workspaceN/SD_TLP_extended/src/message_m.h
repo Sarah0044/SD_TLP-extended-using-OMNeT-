@@ -22,7 +22,6 @@ class QueueReport;
 class SignalState;
 class EvAtStopLine;
 class EvGo;
-class EvCleared;
 class EvQueueAhead;
 /**
  * Class generated from <tt>message.msg:1</tt> by opp_msgtool.
@@ -303,6 +302,10 @@ inline void doParsimUnpacking(omnetpp::cCommBuffer *b, EvAtStopLine& obj) {obj.p
  *     int evId;
  *     int intersectionId;
  * }
+ * 
+ * //message EvCleared {//EV informs controller it actually crossed so the controller can end preemption safely (from ev to rsu, and the rsu will send it to controller)
+ *     //int evId;
+ *    // int intersectionId;
  * </pre>
  */
 class EvGo : public ::omnetpp::cPacket
@@ -337,49 +340,9 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const EvGo& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, EvGo& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>message.msg:44</tt> by opp_msgtool.
- * <pre>
- * message EvCleared
- * {
- *     int evId;
- *     int intersectionId;
- * }
- * </pre>
- */
-class EvCleared : public ::omnetpp::cMessage
-{
-  protected:
-    int evId = 0;
-    int intersectionId = 0;
-
-  private:
-    void copy(const EvCleared& other);
-
-  protected:
-    bool operator==(const EvCleared&) = delete;
-
-  public:
-    EvCleared(const char *name=nullptr, short kind=0);
-    EvCleared(const EvCleared& other);
-    virtual ~EvCleared();
-    EvCleared& operator=(const EvCleared& other);
-    virtual EvCleared *dup() const override {return new EvCleared(*this);}
-    virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
-    virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
-
-    virtual int getEvId() const;
-    virtual void setEvId(int evId);
-
-    virtual int getIntersectionId() const;
-    virtual void setIntersectionId(int intersectionId);
-};
-
-inline void doParsimPacking(omnetpp::cCommBuffer *b, const EvCleared& obj) {obj.parsimPack(b);}
-inline void doParsimUnpacking(omnetpp::cCommBuffer *b, EvCleared& obj) {obj.parsimUnpack(b);}
-
-/**
  * Class generated from <tt>message.msg:48</tt> by opp_msgtool.
  * <pre>
+ * //}
  * packet EvQueueAhead
  * {
  *     int evId;
@@ -437,7 +400,6 @@ template<> inline QueueReport *fromAnyPtr(any_ptr ptr) { return check_and_cast<Q
 template<> inline SignalState *fromAnyPtr(any_ptr ptr) { return check_and_cast<SignalState*>(ptr.get<cObject>()); }
 template<> inline EvAtStopLine *fromAnyPtr(any_ptr ptr) { return check_and_cast<EvAtStopLine*>(ptr.get<cObject>()); }
 template<> inline EvGo *fromAnyPtr(any_ptr ptr) { return check_and_cast<EvGo*>(ptr.get<cObject>()); }
-template<> inline EvCleared *fromAnyPtr(any_ptr ptr) { return check_and_cast<EvCleared*>(ptr.get<cObject>()); }
 template<> inline EvQueueAhead *fromAnyPtr(any_ptr ptr) { return check_and_cast<EvQueueAhead*>(ptr.get<cObject>()); }
 
 }  // namespace omnetpp
