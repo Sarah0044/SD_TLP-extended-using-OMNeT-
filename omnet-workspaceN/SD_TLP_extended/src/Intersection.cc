@@ -121,6 +121,7 @@ void Intersection::initialize()
     aiwtB_arrivalsCrossSum = 0;
     awtB_initialRescueSum = 0;
     awtB_arrivalsRescueSum = 0;
+    fixedRescueCount_B.assign(numApproaches, 0);
 
     // also initialize this if not already
     totalArrivalsAll = 0;
@@ -171,13 +172,7 @@ void Intersection::handleMessage(cMessage *msg)
             }
             if (simTime() >= warmupTime && metricsBActive) {
 
-                bool isRescueApproachNow_B = false;
-
-                if (activeEvCount > 0) {
-                    isRescueApproachNow_B = (rescueCountPerApproach[a] > 0);
-                } else {
-                    isRescueApproachNow_B = (lastRescueApproach != -1 && a == lastRescueApproach);
-                }
+                bool isRescueApproachNow_B = (fixedRescueCount_B[a] > 0);
 
                 if (isRescueApproachNow_B) {
                     arrivalsRescueWindow_B++;
@@ -185,7 +180,6 @@ void Intersection::handleMessage(cMessage *msg)
                     arrivalsCrossWindow_B++;
                 }
             }
-
             scheduleAt(simTime() + exponential(arrivalMean.dbl()), arrivalTimers[a]); //Schedule next normal vehicle arrival
             return;
         }
@@ -345,6 +339,15 @@ void Intersection::handleMessage(cMessage *msg)
                      if (!metricsBActive) {
                          metricsBActive = true;
                          metricsBEnd = simTime() + fixedWindow;
+                         fixedRescueCount_B.assign(numApproaches, 0);
+
+                     }
+
+                     // mark this approach as part of B rescue set
+                     if (fixedRescueCount_B[a] == 0) {
+                         fixedRescueCount_B[a] = 1;
+                     } else {
+                         fixedRescueCount_B[a]++;
                      }
 
                      if (!windowSnapTaken_B) {
@@ -360,6 +363,13 @@ void Intersection::handleMessage(cMessage *msg)
 
                          arrivalsCrossWindow_B = 0;
                          arrivalsRescueWindow_B = 0;
+                     }
+                     else {
+                         // if another EV joins on a new approach during B window,
+                         // add its currently queued vehicles to rescue denominator
+                         if (fixedRescueCount_B[a] == 1) {
+                             initialRescueQueued_B += queueLen[a];
+                         }
                      }
 
 
@@ -474,6 +484,7 @@ void Intersection::handleMessage(cMessage *msg)
             initialRescueQueued_B = 0;
             arrivalsCrossWindow_B = 0;
             arrivalsRescueWindow_B = 0;
+            fixedRescueCount_B.assign(numApproaches, 0);
         }
 
 /*
@@ -587,13 +598,7 @@ void Intersection::handleMessage(cMessage *msg)
 
             for (int a = 0; a < numApproaches; a++) {
 
-                bool isRescueApproachNow_B = false;
-
-                if (activeEvCount > 0) {
-                    isRescueApproachNow_B = (rescueCountPerApproach[a] > 0);
-                } else {
-                    isRescueApproachNow_B = (lastRescueApproach != -1 && a == lastRescueApproach);
-                }
+                bool isRescueApproachNow_B = (fixedRescueCount_B[a] > 0);
 
                 if (!isRescueApproachNow_B) {
                     waitingImposedSec_B += queueLen[a];

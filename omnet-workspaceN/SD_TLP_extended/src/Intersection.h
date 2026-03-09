@@ -118,7 +118,7 @@ class Intersection : public cSimpleModule
    long long aiwtB_arrivalsCrossSum;
    long long awtB_initialRescueSum;
    long long awtB_arrivalsRescueSum;
-
+   std::vector<int> fixedRescueCount_B;
    // --- UNION metrics window state ---
    bool metricsActive;
    simtime_t metricsEnd;        // when to stop metrics after tail
