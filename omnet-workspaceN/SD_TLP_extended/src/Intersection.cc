@@ -101,6 +101,32 @@ void Intersection::initialize()
     awtA_initialRescueSum  = 0;
     awtA_arrivalsRescueSum = 0;
 
+
+    //for fixed window metrics --> use option B
+    fixedWindow = par("fixedWindow").doubleValue();   // e.g. 20 s
+    // Option B init
+    metricsBActive = false;
+    metricsBEnd = SIMTIME_ZERO;
+
+    waitingImposedSec_B = 0.0;
+    waitingRescueRouteSec_B = 0.0;
+
+    initialCrossQueued_B = 0;
+    initialRescueQueued_B = 0;
+    arrivalsCrossWindow_B = 0;
+    arrivalsRescueWindow_B = 0;
+    windowSnapTaken_B = false;
+
+    aiwtB_initialCrossSum = 0;
+    aiwtB_arrivalsCrossSum = 0;
+    awtB_initialRescueSum = 0;
+    awtB_arrivalsRescueSum = 0;
+
+    // also initialize this if not already
+    totalArrivalsAll = 0;
+
+
+
     // Preemption & Recovery State
     preemptActive = false;//true if preemption is active
     recoveryActive = false;//true if recovery is active
@@ -143,6 +169,22 @@ void Intersection::handleMessage(cMessage *msg)
                     arrivalsCrossWindow++;
                 }
             }
+            if (simTime() >= warmupTime && metricsBActive) {
+
+                bool isRescueApproachNow_B = false;
+
+                if (activeEvCount > 0) {
+                    isRescueApproachNow_B = (rescueCountPerApproach[a] > 0);
+                } else {
+                    isRescueApproachNow_B = (lastRescueApproach != -1 && a == lastRescueApproach);
+                }
+
+                if (isRescueApproachNow_B) {
+                    arrivalsRescueWindow_B++;
+                } else {
+                    arrivalsCrossWindow_B++;
+                }
+            }
 
             scheduleAt(simTime() + exponential(arrivalMean.dbl()), arrivalTimers[a]); //Schedule next normal vehicle arrival
             return;
@@ -169,16 +211,9 @@ void Intersection::handleMessage(cMessage *msg)
         std::string action = cmd->getAction();
 
         if (action == "PREEMPT") {
-            /*
-            preemptActive = true; //preemption mode is now active
-            recoveryActive = false;// recovery is off
-
-            preemptApproach = cmd->getApproach();
-            rescueRouteApproach = preemptApproach;
-
-            lastPreemptApproach = preemptApproach;//remembers which approach was last preempted
-            recoveryBlockApproach = -1;//clears any previous recovery
-            */
+            EV_INFO << "[TL CMD] t=" << simTime()
+                    << " action=" << action
+                    << " intersection=" << intersectionId << "\n";
 
             int evApproach = cmd->getApproach();// get the ev approach
 
@@ -306,6 +341,30 @@ void Intersection::handleMessage(cMessage *msg)
                         arrivalsCrossWindow = 0;
                         arrivalsRescueWindow = 0;
                     }
+                     // Option B fixed window start
+                     if (!metricsBActive) {
+                         metricsBActive = true;
+                         metricsBEnd = simTime() + fixedWindow;
+                     }
+
+                     if (!windowSnapTaken_B) {
+                         windowSnapTaken_B = true;
+
+                         initialRescueQueued_B = queueLen[a];
+
+                         long long sumCrossB = 0;
+                         for (int ap = 0; ap < numApproaches; ap++) {
+                             if (ap != a) sumCrossB += queueLen[ap];
+                         }
+                         initialCrossQueued_B = sumCrossB;
+
+                         arrivalsCrossWindow_B = 0;
+                         arrivalsRescueWindow_B = 0;
+                     }
+
+
+
+
                 }
 
                 // Tell EV how many cars are ahead right now
@@ -396,6 +455,27 @@ void Intersection::handleMessage(cMessage *msg)
             arrivalsCrossWindow = 0;
             arrivalsRescueWindow = 0;
         }
+
+        //  Option B fixed window stop
+        if (metricsBActive &&
+            metricsBEnd != SIMTIME_ZERO &&
+            simTime() >= metricsBEnd) {
+
+            metricsBActive = false;
+            metricsBEnd = SIMTIME_ZERO;
+
+            aiwtB_initialCrossSum  += initialCrossQueued_B;
+            aiwtB_arrivalsCrossSum += arrivalsCrossWindow_B;
+            awtB_initialRescueSum  += initialRescueQueued_B;
+            awtB_arrivalsRescueSum += arrivalsRescueWindow_B;
+
+            windowSnapTaken_B = false;
+            initialCrossQueued_B = 0;
+            initialRescueQueued_B = 0;
+            arrivalsCrossWindow_B = 0;
+            arrivalsRescueWindow_B = 0;
+        }
+
 /*
         //  Signal Phase Logic
         int currentActiveApproach = -1;
@@ -503,7 +583,27 @@ void Intersection::handleMessage(cMessage *msg)
                 }
             }
         }
+        if (simTime() >= warmupTime && metricsBActive) {
 
+            for (int a = 0; a < numApproaches; a++) {
+
+                bool isRescueApproachNow_B = false;
+
+                if (activeEvCount > 0) {
+                    isRescueApproachNow_B = (rescueCountPerApproach[a] > 0);
+                } else {
+                    isRescueApproachNow_B = (lastRescueApproach != -1 && a == lastRescueApproach);
+                }
+
+                if (!isRescueApproachNow_B) {
+                    waitingImposedSec_B += queueLen[a];
+                }
+
+                if (isRescueApproachNow_B) {
+                    waitingRescueRouteSec_B += queueLen[a];
+                }
+            }
+        }
         // Vehicle Discharge
         if (currentActiveApproach >= 0 && queueLen[currentActiveApproach] > 0) {//there is an approach currently allowed to move and there are vehicles waiting in that queue
 
@@ -663,7 +763,30 @@ void Intersection::finish()
     recordScalar("AWT_A_den_initialRescueSum", awtA_initialRescueSum);//Vehicles already queued on rescue route at window start.
     recordScalar("AWT_A_den_arrivalsRescueSum", awtA_arrivalsRescueSum);//Rescue-route arrivals during window.
     recordScalar("AWT_A_den_total", awtDenA);//their total
+    double aiwtDenB = (double)(aiwtB_initialCrossSum + aiwtB_arrivalsCrossSum);
+    double awtDenB  = (double)(awtB_initialRescueSum + awtB_arrivalsRescueSum);
 
+    if (aiwtDenB > 0.0)
+        recordScalar("AIWT_B_seconds", waitingImposedSec_B / aiwtDenB);
+    else
+        recordScalar("AIWT_B_seconds", 0.0);
+
+    if (awtDenB > 0.0)
+        recordScalar("AWT_B_seconds", waitingRescueRouteSec_B / awtDenB);
+    else
+        recordScalar("AWT_B_seconds", 0.0);
+
+    // B parts
+    recordScalar("AIWT_B_num_waitingImposedSec", waitingImposedSec_B);
+    recordScalar("AWT_B_num_waitingRescueRouteSec", waitingRescueRouteSec_B);
+
+    recordScalar("AIWT_B_den_initialCrossSum", aiwtB_initialCrossSum);
+    recordScalar("AIWT_B_den_arrivalsCrossSum", aiwtB_arrivalsCrossSum);
+    recordScalar("AIWT_B_den_total", aiwtDenB);
+
+    recordScalar("AWT_B_den_initialRescueSum", awtB_initialRescueSum);
+    recordScalar("AWT_B_den_arrivalsRescueSum", awtB_arrivalsRescueSum);
+    recordScalar("AWT_B_den_total", awtDenB);
     // Cleanup
     for (auto *t : arrivalTimers) cancelAndDelete(t);
     cancelAndDelete(reportTimer);

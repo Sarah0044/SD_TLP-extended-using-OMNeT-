@@ -96,6 +96,29 @@ class Intersection : public cSimpleModule
    int pendingPreemptApproach = -1;
    simtime_t preemptClearEnd = SIMTIME_ZERO;
 
+   //  Option B: fixed-end window
+   double fixedWindow;              // e.g. 20 s
+
+   bool metricsBActive;
+   simtime_t metricsBEnd;
+
+   // B numerators
+   double waitingImposedSec_B;
+   double waitingRescueRouteSec_B;
+
+   // B per-window denominators
+   long long initialCrossQueued_B;
+   long long initialRescueQueued_B;
+   long long arrivalsCrossWindow_B;
+   long long arrivalsRescueWindow_B;
+   bool windowSnapTaken_B;
+
+   // B cumulative denominators across windows
+   long long aiwtB_initialCrossSum;
+   long long aiwtB_arrivalsCrossSum;
+   long long awtB_initialRescueSum;
+   long long awtB_arrivalsRescueSum;
+
    // --- UNION metrics window state ---
    bool metricsActive;
    simtime_t metricsEnd;        // when to stop metrics after tail

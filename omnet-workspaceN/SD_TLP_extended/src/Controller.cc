@@ -854,6 +854,8 @@ void Controller::endSessionToNormal()
  void Controller::applyNoPreempt()
 {
     if (session.active) endSessionToNormal();
+    EV_INFO << "[NO_PREEMPT] t=" << simTime()
+            << " session.active=" << session.active << "\n";
 }
 
  // applyFcfs(): baseline
