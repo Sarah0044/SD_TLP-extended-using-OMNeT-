@@ -818,7 +818,15 @@ void Controller::initialize()
 {
      // End current session and immediately start the new winner.
          // The intersection's phase-aware PREEMPT logic will safely transition.
-         endSessionToNormal();
+         //endSessionToNormal();
+     // clear only controller-side session state
+         session.active = false;
+         session.evId = -1;
+         session.intersectionId = -1;
+         session.approach = -1;
+         session.severity = 3;
+         session.inClear = false;
+         session.pendingEvId = -1;
          startSession(newWinner);
 }
 
@@ -861,6 +869,7 @@ void Controller::endSessionToNormal()
  // applyFcfs(): baseline
 // First EV that satisfies DEMV <= DD gets served; no override.
 // Tie: earliest tSent (or lastSeen)
+
 
 void Controller::applyFcfs()
 {
